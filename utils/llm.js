@@ -3,7 +3,11 @@
 // Provider order (first usable one wins, the next is only a fallback):
 //   1. llm7.io     -> LLM7_API_KEY        (+ LLM7_MODEL, LLM7_URL)
 //   2. OpenRouter  -> OPENROUTER_API_KEY  (+ OPENROUTER_MODEL, OPENROUTER_URL)
-//   3. none        -> isLLMAvailable() is false, the chat answers 503.
+// Models default to each interface's own default: llm7 "default", OpenRouter "openrouter/auto".
+//   3. local       -> LOCAL_LLM_URL (+ LOCAL_LLM_MODEL, LOCAL_LLM_API_KEY): self-hosted OpenAI-compatible server,
+//                     e.g. the llama.cpp "llm" service of the root docker-compose (Gemma 4 E2B on CPU).
+//                     No key needed; it is reachable as long as the URL is set.
+//   4. none        -> isLLMAvailable() is false, the chat answers 503.
 // Back-compat: LLM_BASE_URL / LLM_API_KEY / LLM_MODEL fill the slot of the provider whose host they point to.
 //
 // "API key OK": llm7 -> key set (llm7 also accepts anonymous calls, nothing to probe);
@@ -57,7 +61,14 @@ function providerSpecs() {
             name: "openrouter",
             url: env("OPENROUTER_URL") || (isOr ? legacyUrl : OPENROUTER_URL),
             apiKey: env("OPENROUTER_API_KEY") || (isOr ? legacyKey : undefined),
-            model: env("OPENROUTER_MODEL") || (isOr ? legacyModel : undefined),
+            model: env("OPENROUTER_MODEL") || (isOr ? legacyModel : undefined) || "openrouter/auto",
+        },
+        {
+            name: "local",
+            url: env("LOCAL_LLM_URL"),
+            apiKey: env("LOCAL_LLM_API_KEY") || (env("LOCAL_LLM_URL") ? "local" : undefined),
+            model: env("LOCAL_LLM_MODEL") || "gemma-4-e2b",
+            local: true,
         },
     ];
 }
@@ -84,7 +95,10 @@ export function getProviders() {
         const { timeout } = settings();
         const out = [];
         for (const spec of providerSpecs()) {
-            if (!keyPresent(spec.apiKey)) { console.log(`[LLM] ${spec.name}: no API key -> skipped`); continue; }
+            if (spec.local ? !spec.url : !keyPresent(spec.apiKey)) {
+                console.log(`[LLM] ${spec.name}: ${spec.local ? "no LOCAL_LLM_URL" : "no API key"} -> skipped`);
+                continue;
+            }
             if (!spec.model) { console.log(`[LLM] ${spec.name}: no model (${spec.name.toUpperCase()}_MODEL) -> skipped`); continue; }
             if (spec.name === "openrouter") {
                 const [ok, why] = await openRouterKeyOk(spec.url, spec.apiKey);
@@ -92,12 +106,13 @@ export function getProviders() {
             }
             out.push({
                 ...spec,
-                client: new OpenAI({ baseURL: spec.url, apiKey: spec.apiKey, timeout, maxRetries: 0 }),
+                // a CPU model is slower: give it a longer timeout than the hosted providers
+                client: new OpenAI({ baseURL: spec.url, apiKey: spec.apiKey, timeout: spec.local ? Math.max(timeout, 180_000) : timeout, maxRetries: 0 }),
                 disabledReason: null, cooldownUntil: 0, consecutiveFailures: 0,
             });
             console.log(`[LLM] ${spec.name}: enabled (model=${spec.model})`);
         }
-        if (!out.length) console.log("[LLM] no usable provider (set LLM7_API_KEY or OPENROUTER_API_KEY)");
+        if (!out.length) console.log("[LLM] no usable provider (set LLM7_API_KEY, OPENROUTER_API_KEY or LOCAL_LLM_URL)");
         return out;
     })();
     return providersPromise;
@@ -110,18 +125,26 @@ export async function isLLMAvailable() {
 export class LLMUnavailableError extends Error {}
 class EmptyResponse extends Error {}
 
-const RETRY = "retry", REDIRECT = "redirect", DISABLE = "disable";
+const RETRY = "retry", REDIRECT = "redirect", DISABLE = "disable", QUOTA = "quota";
+
+// 429 caused by an exhausted quota/credit (llm7 "quota_exceeded", OpenAI "insufficient_quota"):
+// retrying right away cannot work, so the provider is cooled down for its retry_after and skipped.
+const QUOTA_CODES = new Set(["quota_exceeded", "insufficient_quota", "billing_hard_limit_reached"]);
+const isQuotaError = (e) => e?.status === 429 &&
+    (QUOTA_CODES.has(e?.code) || QUOTA_CODES.has(e?.type) || QUOTA_CODES.has(e?.error?.code) || QUOTA_CODES.has(e?.error?.type));
 
 function classify(e) {
     if (e instanceof EmptyResponse || e instanceof OpenAI.APIConnectionError) return RETRY;   // includes timeouts
     const s = e?.status;
+    if (isQuotaError(e)) return QUOTA;
     if ([401, 402, 403, 404].includes(s)) return DISABLE;
     if (s === 429 || s === 408 || s === 409 || (s >= 500)) return RETRY;
     return REDIRECT;
 }
 
 function retryAfterMs(e) {
-    const v = e?.headers?.get?.("retry-after") ?? e?.headers?.["retry-after"];
+    // Retry-After header, else "retry_after" in the JSON error body (llm7 sends it there)
+    const v = e?.headers?.get?.("retry-after") ?? e?.headers?.["retry-after"] ?? e?.error?.retry_after ?? e?.retry_after;
     const n = Number(v);
     return Number.isFinite(n) && v != null ? n * 1000 : null;
 }
@@ -159,6 +182,12 @@ async function tryProvider(p, params, signal, attempts) {
             last = e;
             const kind = classify(e);
             attempts.push({ provider: p.name, attempt: attempt + 1, ok: false, action: kind, status: e?.status ?? null });
+            if (kind === QUOTA) {
+                const ms = Math.max(retryAfterMs(e) ?? 60_000, 5_000);
+                p.cooldownUntil = Date.now() + ms;
+                console.log(`[LLM] ${p.name}: quota exhausted (${e?.error?.code || e?.code || "429"}) -> skipped for ${Math.round(ms / 1000)}s, redirecting`);
+                throw e;
+            }
             if (kind === DISABLE) {
                 p.disabledReason = `HTTP ${e.status}: ${String(e.message).slice(0, 200)}`;
                 console.log(`[LLM] ${p.name}: disabled for this process (${p.disabledReason}) -> redirecting`);

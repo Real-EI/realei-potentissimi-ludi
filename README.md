@@ -19,9 +19,14 @@ npm run dev               # http://localhost:3001
 | `NEXT_PUBLIC_SITE_URL` | build | Public URL, used for Open Graph / X preview links |
 | `LLM7_API_KEY`, `LLM7_MODEL` | runtime | llm7.io (first choice) |
 | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | runtime | OpenRouter (fallback, key checked for free at start) |
+| `LOCAL_LLM_URL`, `LOCAL_LLM_MODEL` | runtime | last fallback: self-hosted llama.cpp server (`gemma-4-e2b`) |
 | `LLM_MAX_RETRIES`, `LLM_PROVIDER_COOLDOWN`, ... | runtime | retry / redirect tuning, see `.env.example` |
 
-Without an LLM key the game still works; only the AI assistant answers "non configurato".
+Order: llm7 → OpenRouter → local server. The local server is the `llm` service of the root
+`docker-compose.yaml` (llama.cpp, Gemma 4 E2B Q4_0, CPU only): `docker compose up -d llm`, then
+`LOCAL_LLM_URL=http://localhost:8080/v1` (from another container on the same network: `http://llm:8080/v1`).
+
+Without any provider the game still works; only the AI assistant answers "non configurato".
 
 ## Production
 
