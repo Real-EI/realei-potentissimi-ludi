@@ -1,5 +1,5 @@
 import Swal from "sweetalert2";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Send, Sparkles, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -8,6 +8,25 @@ function AIAssistant({ llmPayload, onAskAI }) {
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
     const [messages, setMessages] = useState([]);
+    const scrollRef = useRef(null);
+    const inputRef = useRef(null);
+    const stickToBottom = useRef(true);
+
+    const scrollToBottom = (smooth = true) =>
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+
+    // follow new messages and streamed tokens, unless the user scrolled up to read
+    useEffect(() => {
+        if (open && stickToBottom.current) scrollToBottom(!loading);
+    }, [messages, loading, open]);
+
+    // grow the message box with its text (up to max-h)
+    useEffect(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+    }, [message, open]);
 
     const handleOpen = () => {
         setOpen(true);
@@ -21,6 +40,9 @@ function AIAssistant({ llmPayload, onAskAI }) {
 
         const userMessage = message.trim();
         setMessage("");
+        // the sent message always scrolls into view
+        stickToBottom.current = true;
+        requestAnimationFrame(() => scrollToBottom(true));
 
         setMessages((prev) => [
             ...prev,
@@ -175,7 +197,13 @@ function AIAssistant({ llmPayload, onAskAI }) {
                             </div>
 
                             {/* MESSAGES */}
-                            <div className="h-[55vh] max-h-[520px] overflow-y-auto bg-slate-50/70 px-5 py-6">
+                            <div
+                                ref={scrollRef}
+                                onScroll={(e) => {
+                                    const el = e.currentTarget;
+                                    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                                }}
+                                className="h-[55dvh] max-h-[520px] overflow-y-auto overscroll-contain bg-slate-50/70 px-4 sm:px-5 py-6">
                                 <div className="space-y-4">
                                     <div className="space-y-4">
                                         {messages.length === 0 && (
@@ -214,7 +242,7 @@ function AIAssistant({ llmPayload, onAskAI }) {
                                                                 : "max-w-[80%] rounded-2xl rounded-tl-md bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm"
                                                         }
                                                     >
-                                                        <span className="whitespace-pre-wrap">{item.content}</span>
+                                                        <span className="whitespace-pre-wrap break-words">{item.content}</span>
                                                     </div>
                                                 </motion.div>
                                             );
@@ -244,13 +272,17 @@ function AIAssistant({ llmPayload, onAskAI }) {
                             </div>
 
                             {/* INPUT */}
-                            <div className="border-t border-slate-100 bg-white p-4">
+                            <div className="border-t border-slate-100 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                                 <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 transition-colors focus-within:border-blue-400 focus-within:bg-white">
                                     <textarea
+                                        ref={inputRef}
                                         value={message}
+                                        enterKeyHint="enter"
                                         onChange={(e) => setMessage(e.target.value)}
                                         onKeyDown={(e) => {
-                                            if (e.key === "Enter" && !e.shiftKey) {
+                                            // phones (touch keyboard): Enter = new line, the button sends
+                                            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing
+                                                && !window.matchMedia("(pointer: coarse)").matches) {
                                                 e.preventDefault();
                                                 handleSend();
                                             }
@@ -258,7 +290,7 @@ function AIAssistant({ llmPayload, onAskAI }) {
                                         placeholder="Chiedi qualcosa sull'asta..."
                                         rows={1}
                                         maxLength={1000}
-                                        className="max-h-28 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                                        className="max-h-36 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-base sm:text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400"
                                     />
 
                                     <motion.button
@@ -274,7 +306,7 @@ function AIAssistant({ llmPayload, onAskAI }) {
                                     </motion.button>
                                 </div>
 
-                                <p className="mt-2 text-center font-mono text-[8px] text-slate-400">
+                                <p className="mt-2 hidden text-center font-mono text-[8px] text-slate-400 sm:block">
                                     Invio per mandare · Shift + Invio per andare a capo
                                 </p>
                             </div>
