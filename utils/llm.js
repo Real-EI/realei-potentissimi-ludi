@@ -8,6 +8,8 @@
 //                     e.g. the llama.cpp "llm" service of the root docker-compose (Gemma 4 E2B on CPU).
 //                     No key needed; it is reachable as long as the URL is set.
 //   4. none        -> isLLMAvailable() is false, the chat answers 503.
+// LLM_PROVIDER_ORDER (comma list of llm7, openrouter, local) changes that order, e.g. "local,llm7,openrouter" =
+// self-hosted llama.cpp first, cloud only as fallback; providers not listed keep their default place after it.
 // Back-compat: LLM_BASE_URL / LLM_API_KEY / LLM_MODEL fill the slot of the provider whose host they point to.
 //
 // "API key OK": llm7 -> key set (llm7 also accepts anonymous calls, nothing to probe);
@@ -87,6 +89,13 @@ async function openRouterKeyOk(url, key) {
     }
 }
 
+/** Apply LLM_PROVIDER_ORDER; unknown names are ignored, unlisted providers keep their default order. */
+function orderProviders(providers) {
+    const wanted = env("LLM_PROVIDER_ORDER", "").split(",").map((n) => n.trim().toLowerCase()).filter(Boolean);
+    const rank = (p) => (wanted.includes(p.name) ? wanted.indexOf(p.name) : wanted.length);
+    return [...providers].sort((a, b) => rank(a) - rank(b));   // Array.sort is stable: ties keep default order
+}
+
 let providersPromise = null;
 
 /** Ordered list of providers whose API key is OK (resolved once per server process). */
@@ -113,7 +122,9 @@ export function getProviders() {
             console.log(`[LLM] ${spec.name}: enabled (model=${spec.model})`);
         }
         if (!out.length) console.log("[LLM] no usable provider (set LLM7_API_KEY, OPENROUTER_API_KEY or LOCAL_LLM_URL)");
-        return out;
+        const ordered = orderProviders(out);
+        if (ordered.length) console.log(`[LLM] order: ${ordered.map((p) => p.name).join(" -> ")}`);
+        return ordered;
     })();
     return providersPromise;
 }
