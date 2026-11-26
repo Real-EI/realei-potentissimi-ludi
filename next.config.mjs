@@ -2,6 +2,12 @@
 const nextConfig = {
   /* config options here */
   reactCompiler: true,
+  output: "standalone",
+  // data/answers is read at runtime with fs (app/api/check): include it in the standalone bundle
+  outputFileTracingIncludes: {
+    "/api/check": ["./data/answers/**/*"],
+    "/api/chat": ["./public/auctions/**/metadata.json"],
+  },
   poweredByHeader: false,
   async headers() {
     return [

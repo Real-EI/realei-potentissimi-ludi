@@ -5,12 +5,33 @@ import "./globals.css";
 // import NavBar from "@/components/NavBar";
 // import ThemeToggle from "@/components/ThemeToggle";
 
+// Public URL of the site: absolute links for social previews (Open Graph / X cards).
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "http://localhost:3001";
+const TITLE = "Realei – Gioca e Impara";
+const DESCRIPTION = "Impara a leggere un'asta immobiliare giocando: trova gli indizi nei documenti di un'asta vera con l'aiuto dell'AI.";
+
 export const metadata = {
-	title: "Realei – Notte dei Ricercatori",
-	description: "Scopri come l'intelligenza artificiale aiuta a leggere le aste immobiliari.",
-	applicationName: "realei-notte-ricercatori",
-	manifest: "/manifest.webmanifest",
+	metadataBase: new URL(SITE_URL),
+	title: { default: TITLE, template: "%s · Realei" },
+	description: DESCRIPTION,
+	applicationName: "Realei Gioca",
+	keywords: ["aste immobiliari", "aste giudiziarie", "intelligenza artificiale", "gioco", "perizia", "Real-EI"],
+	alternates: { canonical: "/" },
 	appleWebApp: { capable: true, statusBarStyle: "default", title: "Realei" },
+	openGraph: {
+		type: "website",
+		locale: "it_IT",
+		url: "/",
+		siteName: "Realei",
+		title: TITLE,
+		description: DESCRIPTION,
+	},
+	twitter: {
+		card: "summary_large_image",
+		title: TITLE,
+		description: DESCRIPTION,
+	},
+	robots: { index: true, follow: true },
 };
 
 export const viewport = {
