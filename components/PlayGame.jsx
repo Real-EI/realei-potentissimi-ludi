@@ -59,8 +59,7 @@ export default function PlayGame({ auction, setSelectedAuction, onAskAI }) {
 
     const [metadata, setMetadata] = useState(null);
     const [metadataLoading, setMetadataLoading] = useState(true);
-    const [matchJson, setMatchJson] = useState(null);
-    const [matchJsonLoading, setMatchJsonLoading] = useState(true);
+    const [checking, setChecking] = useState({});
 
     const [clueAnswers, setClueAnswers] = useState({
         superficie: "",
@@ -112,40 +111,6 @@ export default function PlayGame({ auction, setSelectedAuction, onAskAI }) {
 
 
     useEffect(() => {
-        let cancelled = false;
-
-        async function loadMatchJson() {
-            setMatchJsonLoading(true);
-            setMatchJson(null);
-
-            try {
-                const response = await fetch(`/auctions/${auction.id}/response.json`, {
-                    cache: "no-store",
-                });
-
-                if (!response.ok) { throw new Error(`HTTP ${response.status}`); }
-                const data = await response.json();
-                if (!cancelled) { setMatchJson(data); }
-
-            } catch (error) {
-                console.error("Error loading match JSON:", error);
-                if (!cancelled) {setMatchJson(null);}
-
-            } finally {
-                if (!cancelled) {
-                    setMatchJsonLoading(false);
-                }
-            }
-        }
-
-        loadMatchJson();
-        return () => {cancelled = true;};
-    }, [auction.id]);
-
-
-
-
-    useEffect(() => {
         setClueAnswers({
             superficie: "",
             prezzoBase: "",
@@ -161,6 +126,7 @@ export default function PlayGame({ auction, setSelectedAuction, onAskAI }) {
         });
 
         setCompleted(false);
+        setChecking({});
     }, [auction.id]);
 
     useEffect(() => {
@@ -172,11 +138,27 @@ export default function PlayGame({ auction, setSelectedAuction, onAskAI }) {
         setClueResults((previous) => ({ ...previous, [id]: null }));
     };
 
-    const handleCheckClue = (clue) => {
-        if (!metadata) return;
+    const handleCheckClue = async (clue) => {
         const userAnswer = clueAnswers[clue.id];
-        if (!userAnswer?.trim()) return;
-        const correct = clue.check(userAnswer, matchJson);
+        if (!userAnswer?.trim() || checking[clue.id]) return;
+
+        setChecking((previous) => ({ ...previous, [clue.id]: true }));
+        let correct = false;
+        try {
+            const response = await fetch("/api/check", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ auctionId: auction.id, clueId: clue.id, answer: userAnswer }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data?.error || `HTTP ${response.status}`);
+            correct = data.correct === true;
+        } catch (error) {
+            console.error("Error checking clue:", error);
+            setChecking((previous) => ({ ...previous, [clue.id]: false }));
+            return;     // network/server error: leave the answer unjudged
+        }
+        setChecking((previous) => ({ ...previous, [clue.id]: false }));
 
         setClueResults((previous) => {
             const next = { ...previous, [clue.id]: correct };
@@ -235,7 +217,8 @@ export default function PlayGame({ auction, setSelectedAuction, onAskAI }) {
                         clueResults={clueResults}
                         onChange={handleClueChange}
                         onCheck={handleCheckClue}
-                        metadataLoaded={!metadataLoading && !!metadata}
+                        metadataLoaded={!metadataLoading}
+                        checking={checking}
                     />
 
                     <motion.div

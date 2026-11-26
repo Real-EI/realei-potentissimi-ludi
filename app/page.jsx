@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react";
-import FadeComponent from "@/components/FadeComponent";
 import Image from "next/image";
 import Link from "next/link";
 import Footer from "@/components/Footer";
@@ -29,7 +28,7 @@ export default function Home() {
 
 
 	return (
-		<FadeComponent>
+		<>
 			<main className="min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300 ease-in-out">
 				<section className="relative flex min-h-screen items-center">
 					<div className="mx-auto flex h-full w-full max-w-7xl items-center px-6 py-8 lg:px-12">
@@ -231,7 +230,7 @@ export default function Home() {
 				</section>
 			</main>
 			<Footer />
-		</FadeComponent>
+		</>
 	);
 
 

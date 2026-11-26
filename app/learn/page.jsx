@@ -11,7 +11,6 @@ import {
     ShieldAlert,
 } from "lucide-react";
 
-import FadeComponent from "@/components/FadeComponent";
 import { slides } from "@/utils/slides";
 
 
@@ -34,7 +33,7 @@ export default function LearnPage() {
     };
 
     return (
-        <FadeComponent>
+        <>
             <main className="min-h-screen overflow-hidden bg-background text-foreground">
                 <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-6 sm:px-8 lg:px-12">
 
@@ -332,6 +331,6 @@ export default function LearnPage() {
                     </footer>
                 </div>
             </main>
-        </FadeComponent>
+        </>
     );
 }

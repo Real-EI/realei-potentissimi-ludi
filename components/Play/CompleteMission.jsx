@@ -48,7 +48,7 @@ function CompleteMission({ completed, canComplete, onComplete, score, setSelecte
                             </div>
                         </div>
 
-                        <button onClick={() => setSelectedAuction(null)} className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 transition-transform group-hover:translate-x-1">
+                        <button type="button" onClick={() => setSelectedAuction(null)} aria-label="Torna alla scelta delle aste" title="Scegli un'altra asta" className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 transition-transform group-hover:translate-x-1">
                             <ChevronRight className="h-5 w-5" />
                         </button>
                     </div>
