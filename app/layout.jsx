@@ -1,10 +1,24 @@
-// import { Geist, Geist_Mono } from "next/font/google";
-// import "./globals.css";
+import "./globals.css";
 
 // import { ThemeProvider } from "next-themes";
 // import NextTopLoader from "nextjs-toploader";
 // import NavBar from "@/components/NavBar";
 // import ThemeToggle from "@/components/ThemeToggle";
+
+export const metadata = {
+	title: "Realei – Notte dei Ricercatori",
+	description: "Scopri come l'intelligenza artificiale aiuta a leggere le aste immobiliari.",
+	applicationName: "realei-notte-ricercatori",
+	manifest: "/manifest.webmanifest",
+	appleWebApp: { capable: true, statusBarStyle: "default", title: "Realei" },
+};
+
+export const viewport = {
+	width: "device-width",
+	initialScale: 1,
+	viewportFit: "cover",
+	themeColor: "#000000",
+};
 
 // const geistSans = Geist({
 // 	variable: "--font-geist-sans",

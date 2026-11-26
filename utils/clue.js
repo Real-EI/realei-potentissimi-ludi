@@ -2,16 +2,7 @@
 import { CalendarDays, Euro, Home, Ruler } from "lucide-react";
 
 
-function normalizeText(value) {
-    return String(value ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-}
-
-function normalizeNumber(value) {
-    if (value === null || value === undefined) return null;
-    const normalized = String(value).replace(/[€\s]/g, "").replace(/\./g, "").replace(",", ".");
-    const number = Number(normalized);
-    return Number.isFinite(number) ? number : null;
-}
+// Clue definitions shown in the game. Answers are checked on the server: app/api/check + utils/answers.js.
 
 
 export const CLUE_DEFINITIONS = [
@@ -23,12 +14,6 @@ export const CLUE_DEFINITIONS = [
         placeholder: "Es. 45,00 m²",
         color: "blue",
         points: 100,
-
-        check: (userValue, matchJson) => {
-            const user = normalizeNumber(userValue);
-            const expected = normalizeNumber(matchJson.superficie);
-            return user !== null && expected !== null && user === expected;
-        },
     },
 
     {
@@ -39,12 +24,6 @@ export const CLUE_DEFINITIONS = [
         placeholder: "Es. € 100.000",
         color: "emerald",
         points: 150,
-
-        check: (userValue, matchJson) => {
-            const user = normalizeNumber(userValue);
-            const expected = normalizeNumber(matchJson.prezzoBase);
-            return user !== null && expected !== null && user === expected;
-        },
     },
 
     {
@@ -55,12 +34,6 @@ export const CLUE_DEFINITIONS = [
         placeholder: "Es. 19/05/2026",
         color: "violet",
         points: 200,
-
-        check: (userValue, matchJson) => {
-            const user = normalizeText(userValue);
-            const expected = normalizeText(matchJson.dataAsta);
-            return user === expected;
-        },
     },
 
     {
@@ -71,12 +44,6 @@ export const CLUE_DEFINITIONS = [
         placeholder: "Es. occupato dal debitore",
         color: "amber",
         points: 150,
-
-        check: (userValue, matchJson) => {
-            const user = normalizeText(userValue);
-            const expected = normalizeText(matchJson.occupazione);
-            return user === expected;
-        },
     },
 ];
 

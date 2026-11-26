@@ -3,16 +3,10 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened]
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Skip if this is a PR that will be merged
-    if: github.event_name != 'pull_request' || github.event.pull_request.merged != true
     concurrency: release
 
     permissions:
@@ -33,7 +27,7 @@ jobs:
           cache: 'npm'
 
       - name: Setup | Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Debug | Print Environment Info
         run: |

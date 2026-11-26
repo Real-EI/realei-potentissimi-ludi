@@ -34,27 +34,32 @@ function AIAssistant({ llmPayload, onAskAI }) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    auctionId: String(llmPayload.auctionId),
                     message: userMessage,
-                    metadata: llmPayload.metadata,
-                    auction: llmPayload.auction,
-                    documents: llmPayload.documents,
-                    history: messages,
+                    history: messages.slice(-20),
                 }),
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
+            if (!response.ok || !response.body) {
+                const data = await response.json().catch(() => ({}));
                 throw new Error(data?.error || "AI request failed");
             }
 
-            setMessages((prev) => [
-                ...prev,
-                {
-                    role: "assistant",
-                    content: data.message,
-                },
-            ]);
+            // streamed answer: append the text to the last assistant message as it arrives
+            setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let received = "";
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                received += decoder.decode(value, { stream: true });
+                const text = received;
+                setMessages((prev) => [...prev.slice(0, -1), { role: "assistant", content: text }]);
+            }
+            received += decoder.decode();
+            const finalText = received.trim() || "Non ho una risposta per questa domanda.";
+            setMessages((prev) => [...prev.slice(0, -1), { role: "assistant", content: finalText }]);
         } catch (error) {
             // console.error("AI ERROR:", error);
 
@@ -66,13 +71,11 @@ function AIAssistant({ llmPayload, onAskAI }) {
                 confirmButtonColor: "#2563eb",
             });
 
-            setMessages((prev) => [
-                ...prev,
-                {
-                    role: "assistant",
-                    content: "Ops! Non riesco a rispondere in questo momento. Riprova tra poco.",
-                },
-            ]);
+            const fallback = { role: "assistant", content: "Ops! Non riesco a rispondere in questo momento. Riprova tra poco." };
+            // replace an empty streamed bubble, otherwise add the error message
+            setMessages((prev) => (prev.at(-1)?.role === "assistant" && !prev.at(-1).content
+                ? [...prev.slice(0, -1), fallback]
+                : [...prev, fallback]));
         } finally {
             setLoading(false);
         }
@@ -189,6 +192,7 @@ function AIAssistant({ llmPayload, onAskAI }) {
 
                                         {messages.map((item, index) => {
                                             const isUser = item.role === "user";
+                                            if (!isUser && !item.content) return null;   // streaming, no token yet
 
                                             return (
                                                 <motion.div
@@ -210,14 +214,14 @@ function AIAssistant({ llmPayload, onAskAI }) {
                                                                 : "max-w-[80%] rounded-2xl rounded-tl-md bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm"
                                                         }
                                                     >
-                                                        {item.content}
+                                                        <span className="whitespace-pre-wrap">{item.content}</span>
                                                     </div>
                                                 </motion.div>
                                             );
                                         })}
                                     </div>
 
-                                    {loading && (
+                                    {loading && !(messages.at(-1)?.role === "assistant" && messages.at(-1).content) && (
                                         <motion.div
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
@@ -253,6 +257,7 @@ function AIAssistant({ llmPayload, onAskAI }) {
                                         }}
                                         placeholder="Chiedi qualcosa sull'asta..."
                                         rows={1}
+                                        maxLength={1000}
                                         className="max-h-28 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
                                     />
 
@@ -283,7 +288,7 @@ function AIAssistant({ llmPayload, onAskAI }) {
                 {!open && (
                     <motion.button
                         type="button"
-                        onClick={() => setOpen(true)}
+                        onClick={handleOpen}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}

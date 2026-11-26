@@ -7,7 +7,7 @@ import ClueCard from "./ClueCard";
 import { CLUE_DEFINITIONS } from "@/utils/clue";
 
 
-function MissionPanel({ clueAnswers, clueResults, onChange, onCheck, metadataLoaded }) {
+function MissionPanel({ clueAnswers, clueResults, onChange, onCheck, metadataLoaded, checking = {} }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -53,7 +53,7 @@ function MissionPanel({ clueAnswers, clueResults, onChange, onCheck, metadataLoa
                         result={clueResults[clue.id]}
                         onChange={onChange}
                         onCheck={onCheck}
-                        disabled={!metadataLoaded}
+                        disabled={!metadataLoaded || !!checking[clue.id]}
                     />
                 ))}
             </div>
