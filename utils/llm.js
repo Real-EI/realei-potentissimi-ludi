@@ -6,7 +6,8 @@
 // Models default to each interface's own default: llm7 "default", OpenRouter "openrouter/auto".
 //   3. local       -> LOCAL_LLM_URL (+ LOCAL_LLM_MODEL, LOCAL_LLM_API_KEY): self-hosted OpenAI-compatible server,
 //                     e.g. the llama.cpp "llm" service of the root docker-compose (Gemma 4 E2B on CPU).
-//                     No key needed; it is reachable as long as the URL is set.
+//                     No key needed; it is reachable as long as the URL is set. Answers are capped at
+//                     LOCAL_LLM_MAX_TOKENS (default 512).
 //   4. none        -> isLLMAvailable() is false, the chat answers 503.
 // LLM_PROVIDER_ORDER (comma list of llm7, openrouter, local) changes that order, e.g. "local,llm7,openrouter" =
 // self-hosted llama.cpp first, cloud only as fallback; providers not listed keep their default place after it.
@@ -96,6 +97,14 @@ function orderProviders(providers) {
     return [...providers].sort((a, b) => rank(a) - rank(b));   // Array.sort is stable: ties keep default order
 }
 
+/** Local CPU model: clamp max_tokens to LOCAL_LLM_MAX_TOKENS (default 512) -> short, fast answers. */
+function cappedParams(p, params) {
+    if (!p.local) return params;
+    const cap = envNumber("LOCAL_LLM_MAX_TOKENS", 512);
+    if (!(cap > 0)) return params;
+    return { ...params, max_tokens: Math.min(Number(params.max_tokens) || cap, cap) };
+}
+
 let providersPromise = null;
 
 /** Ordered list of providers whose API key is OK (resolved once per server process). */
@@ -169,7 +178,7 @@ const sleep = (ms, signal) => new Promise((resolve, reject) => {
 
 /** Opens a stream and waits for its first token, so a failing provider can still be retried/redirected. */
 async function openStream(p, params, signal) {
-    const stream = await p.client.chat.completions.create({ ...params, model: p.model, stream: true }, { signal });
+    const stream = await p.client.chat.completions.create({ ...cappedParams(p, params), model: p.model, stream: true }, { signal });
     const it = stream[Symbol.asyncIterator]();
     for (;;) {
         const { value, done } = await it.next();
