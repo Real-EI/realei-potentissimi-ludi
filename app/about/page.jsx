@@ -6,7 +6,6 @@ import { z } from "zod";
 import Swal from "sweetalert2";
 import { ArrowUpRight, Check, Code2, Heart, Lightbulb, LinkIcon, Mail, ShieldCheck, Users, X, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import FadeComponent from "@/components/FadeComponent";
 import Footer from "@/components/Footer";
 
 
@@ -64,7 +63,7 @@ export default function Contacts() {
     };
 
     return (
-        <FadeComponent>
+        <>
             <main className="min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
                 <section className="relative border-b border-border">
                     <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-[0.035]" style={{ backgroundImage: "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
@@ -290,6 +289,6 @@ export default function Contacts() {
 
             </main>
             <Footer />
-        </FadeComponent>
+        </>
     );
 }
